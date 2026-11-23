@@ -115,8 +115,12 @@ def cmd_evaluate(args: argparse.Namespace) -> None:
 
 def cmd_demo_seed(args: argparse.Namespace) -> None:
     from logsentinel.demo import reset, seed_demo
+    from logsentinel.models import Event
 
     with session_scope() as session:
+        if args.if_empty and session.scalar(select(Event.id).limit(1)) is not None:
+            print("Database already has events; skipping demo data (use --reset to reload).")
+            return
         if args.reset:
             reset(session)
         counts = seed_demo(session, days=args.days, seed=args.seed)
@@ -174,6 +178,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--days", type=int, default=2)
     p.add_argument("--seed", type=int, default=7)
     p.add_argument("--reset", action="store_true", help="delete existing data first")
+    p.add_argument("--if-empty", action="store_true", help="do nothing if events already exist")
     p.set_defaults(func=cmd_demo_seed)
     return parser
 

@@ -1,0 +1,59 @@
+# Local stack: PostgreSQL + REST API + Streamlit dashboard + one-shot demo data loader.
+#   docker compose up --build
+# Dashboard: http://localhost:8501   API docs: http://localhost:8000/docs
+x-app-env: &app-env
+  DATABASE_URL: postgresql+psycopg://logsentinel:${POSTGRES_PASSWORD:-logsentinel}@db:5432/logsentinel
+  API_KEY: ${API_KEY:-}
+  SLACK_WEBHOOK_URL: ${SLACK_WEBHOOK_URL:-}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USER: ${SMTP_USER:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
+  ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: logsentinel
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-logsentinel}  # local development only
+      POSTGRES_DB: logsentinel
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U logsentinel"]
+      interval: 3s
+      retries: 20
+
+  api:
+    build: .
+    command: sh -c "logsentinel init-db && uvicorn logsentinel.api:app --host 0.0.0.0 --port 8000"
+    environment: *app-env
+    ports: ["8000:8000"]
+    depends_on:
+      db: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      retries: 20
+
+  dashboard:
+    build: .
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0 --server.headless true
+    environment: *app-env
+    ports: ["8501:8501"]
+    depends_on:
+      api: { condition: service_healthy }
+
+  # Runs once: loads synthetic demo data if the database is empty, then exits.
+  simulator:
+    build: .
+    command: logsentinel demo-seed --if-empty
+    environment: *app-env
+    restart: "no"
+    depends_on:
+      api: { condition: service_healthy }
+
+volumes:
+  pgdata:
