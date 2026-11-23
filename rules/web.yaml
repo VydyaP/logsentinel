@@ -1,0 +1,108 @@
+# Web access-log detections. Regexes run on the URL-decoded path ("path_decoded"),
+# because attackers encode payloads (e.g. %27 for ') to slip past naive filters.
+rules:
+  - id: WEB-001
+    name: Directory / vulnerability scanning
+    description: >
+      A burst of 403/404 responses to one IP. Scanners request thousands of
+      guessed paths (/admin, /.env, /wp-login.php) and most do not exist.
+    severity: medium
+    type: threshold
+    where: { source: web, status: [403, 404] }
+    group_by: src_ip
+    threshold: 25
+    window: 2m
+    message: "{count} not-found/forbidden responses to {entity} (peak {peak} within {window}), e.g. {paths}"
+    mitre: { technique_id: T1595.003, technique_name: "Active Scanning: Wordlist Scanning", tactic: Reconnaissance }
+    runbook: docs/runbooks/WEB-001-scanning.md
+    response:
+      - "Rate-limit or block the IP at the WAF/load balancer."
+      - "Check whether any scanned path returned 200 (exposed files such as .env or .git)."
+      - "Remove or protect anything that should not be public."
+
+  - id: WEB-002
+    name: SQL injection attempt
+    description: >
+      URL contains SQL injection syntax (UNION SELECT, tautologies like ' OR 1=1,
+      stacked queries, time-based payloads). Check the response code to see if it worked.
+    severity: high
+    type: threshold
+    where:
+      source: web
+      path_decoded:
+        regex: "(union(\\s|/\\*.*?\\*/)+(all\\s+)?select|'\\s*(or|and)\\s+'?\\w+'?\\s*=\\s*'?\\w+|'\\s*(--|#)|;\\s*(drop|delete|insert|update|shutdown)\\s|\\b(sleep|benchmark|pg_sleep)\\s*\\(|information_schema|xp_cmdshell)"
+    group_by: src_ip
+    threshold: 1
+    window: 10m
+    message: "{count} SQL injection request(s) from {entity}, e.g. {paths}"
+    mitre: { technique_id: T1190, technique_name: Exploit Public-Facing Application, tactic: Initial Access }
+    runbook: docs/runbooks/WEB-002-sql-injection.md
+    response:
+      - "Check the response codes and sizes; a 200 with a large response may mean data was read."
+      - "Block the IP at the WAF and enable SQL injection rules."
+      - "Confirm the affected endpoint uses parameterised queries."
+
+  - id: WEB-003
+    name: Cross-site scripting (XSS) attempt
+    description: >
+      URL contains script injection (<script>, javascript:, onerror=). Usually an
+      attacker probing whether input is reflected without escaping.
+    severity: medium
+    type: threshold
+    where:
+      source: web
+      path_decoded:
+        regex: "(<\\s*script|javascript:|\\bon(error|load|mouseover|focus)\\s*=|<\\s*(svg|iframe|img)\\b|document\\.cookie|alert\\s*\\()"
+    group_by: src_ip
+    threshold: 1
+    window: 10m
+    message: "{count} XSS request(s) from {entity}, e.g. {paths}"
+    mitre: { technique_id: T1190, technique_name: Exploit Public-Facing Application, tactic: Initial Access }
+    runbook: docs/runbooks/WEB-003-xss.md
+    response:
+      - "Check whether the payload is reflected unescaped in the response."
+      - "Block the IP and enable WAF XSS rules."
+      - "Make sure output encoding and a Content-Security-Policy are in place."
+
+  - id: WEB-004
+    name: Path traversal attempt
+    description: >
+      URL tries to climb out of the web root (../) or names sensitive files
+      such as /etc/passwd. A 200 response here is serious.
+    severity: high
+    type: threshold
+    where:
+      source: web
+      path_decoded:
+        regex: "(\\.\\./|\\.\\.\\\\|/etc/(passwd|shadow|hosts)|win\\.ini|boot\\.ini|/proc/self/)"
+    group_by: src_ip
+    threshold: 1
+    window: 10m
+    message: "{count} path traversal request(s) from {entity}, e.g. {paths}"
+    mitre: { technique_id: T1190, technique_name: Exploit Public-Facing Application, tactic: Initial Access }
+    runbook: docs/runbooks/WEB-004-path-traversal.md
+    response:
+      - "Check for 200 responses: a successful traversal can leak system files."
+      - "Block the IP and confirm file paths are normalised and restricted to the web root."
+      - "If sensitive files were served, rotate any secrets they contained."
+
+  - id: WEB-005
+    name: Known attack tool user agent
+    description: >
+      The User-Agent names a well-known scanner (Nikto, sqlmap, Nuclei, ...).
+      Low severity on its own; useful context for other alerts from the same IP.
+    severity: low
+    type: threshold
+    where:
+      source: web
+      user_agent:
+        regex: "(nikto|sqlmap|nmap|masscan|zgrab|gobuster|dirbuster|wpscan|nuclei|acunetix|nessus|openvas|wfuzz|ffuf|feroxbuster)"
+    group_by: src_ip
+    threshold: 1
+    window: 30m
+    message: "{count} request(s) from {entity} with a scanner user agent"
+    mitre: { technique_id: T1595.002, technique_name: "Active Scanning: Vulnerability Scanning", tactic: Reconnaissance }
+    runbook: docs/runbooks/WEB-005-scanner-user-agent.md
+    response:
+      - "Block or rate-limit the IP; legitimate users do not send scanner user agents."
+      - "Use this as context: look for other alerts from the same IP."

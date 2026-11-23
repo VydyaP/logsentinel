@@ -1,0 +1,81 @@
+# SSH authentication detections.
+# Fields are documented in src/logsentinel/detection/rules.py and README "How to add a rule".
+rules:
+  - id: SSH-001
+    name: SSH brute force
+    description: >
+      Many failed SSH logins from one IP address in a short time. Typical of an
+      automated password-guessing tool hammering one or a few accounts.
+    severity: high
+    type: threshold
+    where: { source: ssh, action: login_failed }
+    group_by: src_ip
+    threshold: 10
+    window: 5m
+    message: "{count} failed SSH logins from {entity} (peak {peak} within {window}); accounts tried: {users}"
+    mitre: { technique_id: T1110.001, technique_name: "Brute Force: Password Guessing", tactic: Credential Access }
+    runbook: docs/runbooks/SSH-001-brute-force.md
+    response:
+      - "Block the source IP at the firewall or with fail2ban."
+      - "Check that the targeted accounts have no successful logins from this IP."
+      - "Disable SSH password authentication; allow keys only."
+
+  - id: SSH-002
+    name: SSH password spraying
+    description: >
+      One IP tries many *different* usernames. Spraying uses one or two common
+      passwords against many accounts to stay under per-account lockout limits.
+    severity: high
+    type: distinct
+    where: { source: ssh, action: login_failed }
+    distinct_field: username
+    group_by: src_ip
+    threshold: 8
+    window: 30m
+    message: "{entity} tried {distinct_users} different usernames (peak {peak} within {window}): {users}, ..."
+    mitre: { technique_id: T1110.003, technique_name: "Brute Force: Password Spraying", tactic: Credential Access }
+    runbook: docs/runbooks/SSH-002-password-spraying.md
+    response:
+      - "Block the source IP and look for the same pattern from neighbouring IPs."
+      - "Check every targeted account for a successful login in the same period."
+      - "Enforce MFA and remove default or unused accounts."
+
+  - id: SSH-003
+    name: Successful SSH login after repeated failures
+    description: >
+      A successful login from an IP that just failed several times. The attacker
+      may have guessed a valid password; treat the account as compromised until verified.
+    severity: critical
+    type: sequence
+    where: { source: ssh, action: login_failed }
+    then: { source: ssh, action: login_success }
+    group_by: src_ip
+    threshold: 5
+    window: 30m
+    message: "{entity} logged in as '{last_user}' after {peak} failed attempts within {window}"
+    mitre: { technique_id: T1078, technique_name: Valid Accounts, tactic: Initial Access }
+    runbook: docs/runbooks/SSH-003-login-after-failures.md
+    response:
+      - "Treat the account as compromised: disable it or reset its credentials now."
+      - "Kill the attacker's active sessions and block the source IP."
+      - "Review the host for persistence (new users, authorized_keys, cron jobs) and escalate."
+
+  - id: SSH-004
+    name: SSH login outside business hours
+    description: >
+      A successful SSH login outside 07:00-21:00 India Standard Time. Often legitimate
+      (on-call work), so severity is medium and an analyst confirms with the user.
+    severity: medium
+    type: threshold
+    where: { source: ssh, action: login_success, hour: { outside: [7, 21] } }
+    timezone: Asia/Kolkata
+    group_by: username
+    threshold: 1
+    window: 1h
+    message: "'{entity}' logged in outside business hours ({count} login(s)), from {ips}"
+    mitre: { technique_id: T1078, technique_name: Valid Accounts, tactic: Initial Access }
+    runbook: docs/runbooks/SSH-004-off-hours-login.md
+    response:
+      - "Confirm with the user (or on-call rota) that the login was theirs."
+      - "If not confirmed, reset the credentials and review the session's commands."
+      - "Close as false positive if it was planned work, and note the reason."
