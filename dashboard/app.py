@@ -393,6 +393,10 @@ def page_incidents() -> None:
         use_container_width=True,
         on_select="rerun",
         selection_mode="single-row",
+        column_config={
+            "first seen": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm"),
+            "last seen": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm"),
+        },
     )
     selected = event.selection.rows if event and event.selection else []
     if not selected:

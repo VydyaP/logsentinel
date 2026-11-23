@@ -1,0 +1,375 @@
+{
+  "events": 17187,
+  "attacks": 13,
+  "attack_rows": [
+    {
+      "attack_id": "ATK-001",
+      "attack_type": "brute_force",
+      "src_ip": "203.0.113.85",
+      "expected_rules": [
+        "SSH-001"
+      ],
+      "rules_fired": [
+        "SSH-001"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-002",
+      "attack_type": "password_spray",
+      "src_ip": "203.0.113.151",
+      "expected_rules": [
+        "SSH-002"
+      ],
+      "rules_fired": [
+        "SSH-002"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-003",
+      "attack_type": "web_scan",
+      "src_ip": "203.0.113.53",
+      "expected_rules": [
+        "WEB-001",
+        "WEB-005"
+      ],
+      "rules_fired": [
+        "WEB-001",
+        "WEB-005"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-004",
+      "attack_type": "sqli",
+      "src_ip": "203.0.113.8",
+      "expected_rules": [
+        "WEB-002",
+        "WEB-005"
+      ],
+      "rules_fired": [
+        "WEB-002",
+        "WEB-005"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-005",
+      "attack_type": "brute_force",
+      "src_ip": "203.0.113.245",
+      "expected_rules": [
+        "SSH-001"
+      ],
+      "rules_fired": [
+        "SSH-001"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-006",
+      "attack_type": "password_spray",
+      "src_ip": "203.0.113.88",
+      "expected_rules": [
+        "SSH-002"
+      ],
+      "rules_fired": [
+        "SSH-001",
+        "SSH-002"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-007",
+      "attack_type": "web_scan",
+      "src_ip": "203.0.113.46",
+      "expected_rules": [
+        "WEB-001"
+      ],
+      "rules_fired": [
+        "WEB-001"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-008",
+      "attack_type": "sqli",
+      "src_ip": "203.0.113.170",
+      "expected_rules": [
+        "WEB-002",
+        "WEB-005"
+      ],
+      "rules_fired": [
+        "WEB-002",
+        "WEB-005"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-009",
+      "attack_type": "brute_force_success",
+      "src_ip": "203.0.113.148",
+      "expected_rules": [
+        "SSH-003"
+      ],
+      "rules_fired": [
+        "SSH-001",
+        "SSH-003",
+        "SSH-004"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-010",
+      "attack_type": "off_hours_login",
+      "src_ip": "203.0.113.12",
+      "expected_rules": [
+        "SSH-004"
+      ],
+      "rules_fired": [
+        "SSH-004"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": false
+    },
+    {
+      "attack_id": "ATK-011",
+      "attack_type": "low_and_slow_brute_force",
+      "src_ip": "203.0.113.180",
+      "expected_rules": [
+        "SSH-001"
+      ],
+      "rules_fired": [],
+      "detected_by_rules": false,
+      "expected_rule_fired": false,
+      "detected_by_anomaly": false
+    },
+    {
+      "attack_id": "ATK-012",
+      "attack_type": "xss",
+      "src_ip": "203.0.113.99",
+      "expected_rules": [
+        "WEB-003"
+      ],
+      "rules_fired": [
+        "WEB-003"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    },
+    {
+      "attack_id": "ATK-013",
+      "attack_type": "path_traversal",
+      "src_ip": "203.0.113.3",
+      "expected_rules": [
+        "WEB-004"
+      ],
+      "rules_fired": [
+        "WEB-004"
+      ],
+      "detected_by_rules": true,
+      "expected_rule_fired": true,
+      "detected_by_anomaly": true
+    }
+  ],
+  "per_type": [
+    {
+      "attack_type": "brute_force",
+      "attacks": 2,
+      "detected_by_rules": 2,
+      "detected_by_anomaly": 2
+    },
+    {
+      "attack_type": "brute_force_success",
+      "attacks": 1,
+      "detected_by_rules": 1,
+      "detected_by_anomaly": 1
+    },
+    {
+      "attack_type": "low_and_slow_brute_force",
+      "attacks": 1,
+      "detected_by_rules": 0,
+      "detected_by_anomaly": 0
+    },
+    {
+      "attack_type": "off_hours_login",
+      "attacks": 1,
+      "detected_by_rules": 1,
+      "detected_by_anomaly": 0
+    },
+    {
+      "attack_type": "password_spray",
+      "attacks": 2,
+      "detected_by_rules": 2,
+      "detected_by_anomaly": 2
+    },
+    {
+      "attack_type": "path_traversal",
+      "attacks": 1,
+      "detected_by_rules": 1,
+      "detected_by_anomaly": 1
+    },
+    {
+      "attack_type": "sqli",
+      "attacks": 2,
+      "detected_by_rules": 2,
+      "detected_by_anomaly": 2
+    },
+    {
+      "attack_type": "web_scan",
+      "attacks": 2,
+      "detected_by_rules": 2,
+      "detected_by_anomaly": 2
+    },
+    {
+      "attack_type": "xss",
+      "attacks": 1,
+      "detected_by_rules": 1,
+      "detected_by_anomaly": 1
+    }
+  ],
+  "rule_precision": [
+    {
+      "rule_id": "SSH-001",
+      "alerts": 4,
+      "true_positive_alerts": 4,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "SSH-002",
+      "alerts": 2,
+      "true_positive_alerts": 2,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "SSH-003",
+      "alerts": 1,
+      "true_positive_alerts": 1,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "SSH-004",
+      "alerts": 4,
+      "true_positive_alerts": 2,
+      "false_positive_alerts": 2,
+      "precision": 0.5
+    },
+    {
+      "rule_id": "WEB-001",
+      "alerts": 4,
+      "true_positive_alerts": 2,
+      "false_positive_alerts": 2,
+      "precision": 0.5
+    },
+    {
+      "rule_id": "WEB-002",
+      "alerts": 2,
+      "true_positive_alerts": 2,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "WEB-003",
+      "alerts": 1,
+      "true_positive_alerts": 1,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "WEB-004",
+      "alerts": 1,
+      "true_positive_alerts": 1,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    },
+    {
+      "rule_id": "WEB-005",
+      "alerts": 3,
+      "true_positive_alerts": 3,
+      "false_positive_alerts": 0,
+      "precision": 1.0
+    }
+  ],
+  "rules_overall": {
+    "alert_precision": 0.818,
+    "attack_recall": 0.923,
+    "alerts": 22,
+    "false_positive_alerts": 4,
+    "missed_attacks": 1
+  },
+  "anomaly_windows": {
+    "windows": 818,
+    "attack_windows": 21,
+    "tp": 13,
+    "fp": 4,
+    "fn": 8,
+    "precision": 0.765,
+    "recall": 0.619,
+    "f1": 0.684
+  },
+  "contamination_sweep": [
+    {
+      "contamination": 0.01,
+      "tp": 7,
+      "fp": 2,
+      "fn": 14,
+      "precision": 0.778,
+      "recall": 0.333,
+      "f1": 0.467
+    },
+    {
+      "contamination": 0.02,
+      "tp": 13,
+      "fp": 4,
+      "fn": 8,
+      "precision": 0.765,
+      "recall": 0.619,
+      "f1": 0.684
+    },
+    {
+      "contamination": 0.05,
+      "tp": 16,
+      "fp": 25,
+      "fn": 5,
+      "precision": 0.39,
+      "recall": 0.762,
+      "f1": 0.516
+    },
+    {
+      "contamination": 0.1,
+      "tp": 20,
+      "fp": 62,
+      "fn": 1,
+      "precision": 0.244,
+      "recall": 0.952,
+      "f1": 0.388
+    }
+  ],
+  "combined_attack_recall": 0.923,
+  "notes": [
+    "ATK-011 (low_and_slow_brute_force) was missed by the rules, and the anomaly model missed it too."
+  ]
+}

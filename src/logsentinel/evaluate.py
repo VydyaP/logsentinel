@@ -197,7 +197,7 @@ def evaluate(
             how = (
                 "but the anomaly model flagged it"
                 if row["detected_by_anomaly"]
-                else "and so did the anomaly model"
+                else "and the anomaly model missed it too"
             )
             notes.append(
                 f"{row['attack_id']} ({row['attack_type']}) was missed by the rules, {how}."
@@ -298,4 +298,4 @@ def save(result: EvaluationResult, md_path: Path, json_path: Path, command: str)
     md_path.parent.mkdir(parents=True, exist_ok=True)
     json_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(to_markdown(result, command))
-    json_path.write_text(json.dumps(asdict(result), indent=2, default=str))
+    json_path.write_text(json.dumps(asdict(result), indent=2, default=str) + "\n")

@@ -1,0 +1,3 @@
+# Used by Streamlit Community Cloud: installs this project and its dependencies
+# exactly as declared in pyproject.toml.
+-e .
