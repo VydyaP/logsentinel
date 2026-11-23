@@ -63,7 +63,9 @@ def send_slack(alert: Alert, webhook_url: str, client: httpx.Client | None = Non
 def send_email(alert: Alert, settings: Settings) -> None:
     """Send the alert by SMTP (STARTTLS)."""
     msg = EmailMessage()
-    msg["Subject"] = f"[LogSentinel][{alert.severity.upper()}] {alert.rule_name} from {alert.entity}"
+    msg["Subject"] = (
+        f"[LogSentinel][{alert.severity.upper()}] {alert.rule_name} from {alert.entity}"
+    )
     msg["From"] = settings.alert_email_from or settings.smtp_user
     msg["To"] = settings.alert_email_to
     msg.set_content(format_text(alert))
@@ -90,13 +92,13 @@ def notify(alerts: list[Alert], settings: Settings | None = None) -> int:
             try:
                 send_slack(alert, settings.slack_webhook_url)
                 delivered = True
-            except Exception as exc:  # noqa: BLE001 - never let a notifier break detection
+            except Exception as exc:
                 log.error("Slack notification failed for alert %s: %s", alert.id, exc)
         if email_on:
             try:
                 send_email(alert, settings)
                 delivered = True
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 log.error("E-mail notification failed for alert %s: %s", alert.id, exc)
         if delivered:
             alert.notified_at = utcnow()

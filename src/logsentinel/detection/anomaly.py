@@ -63,9 +63,7 @@ def build_features(events: pd.DataFrame, bucket: str = "1h") -> pd.DataFrame:
         distinct_paths=("path", "nunique"),
         distinct_users=("username", "nunique"),
     ).reset_index()
-    peak = (
-        df.groupby(["src_ip", "bucket", "minute"]).size().groupby(["src_ip", "bucket"]).max()
-    )
+    peak = df.groupby(["src_ip", "bucket", "minute"]).size().groupby(["src_ip", "bucket"]).max()
     feats["peak_per_min"] = peak.to_numpy()
 
     feats["error_ratio"] = (feats["web_error"] / feats["web"].replace(0, np.nan)).fillna(0.0)
@@ -122,9 +120,7 @@ def detect_anomalies(
         end = start + pd.Timedelta(hours=1)
         mask = (df["src_ip"] == row.src_ip) & (df["ts"] >= start) & (df["ts"] < end)
         window_events = df[mask].sort_values("ts")
-        unusual = [
-            f for f in FEATURES[:6] if getattr(row, f) > p95[f] and getattr(row, f) > 0
-        ]
+        unusual = [f for f in FEATURES[:6] if getattr(row, f) > p95[f] and getattr(row, f) > 0]
         reason = ", ".join(_FEATURE_LABELS[f] for f in unusual) or "unusual mix of behaviour"
         detections.append(
             Detection(

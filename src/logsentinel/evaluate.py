@@ -143,7 +143,7 @@ def evaluate(
     )
 
     # ---- alert level (rule precision)
-    rule_precision = []
+    rule_precision: list[dict[str, Any]] = []
     for rule in rules:
         dets = [d for d in rule_dets if d.rule_id == rule.id]
         tp = sum(1 for d in dets if any(_matches(d, lb) for _, lb in labels.iterrows()))
@@ -184,15 +184,24 @@ def evaluate(
         p = f["is_anomaly"]
         t = _window_labels(f, labels)
         sweep.append(
-            {"contamination": c, **_prf(int((p & t).sum()), int((p & ~t).sum()), int((~p & t).sum()))}
+            {
+                "contamination": c,
+                **_prf(int((p & t).sum()), int((p & ~t).sum()), int((~p & t).sum())),
+            }
         )
 
     combined = attacks["detected_by_rules"] | attacks["detected_by_anomaly"]
     notes = []
     for row in attack_rows:
         if not row["detected_by_rules"]:
-            how = "but the anomaly model flagged it" if row["detected_by_anomaly"] else "and so did the anomaly model"
-            notes.append(f"{row['attack_id']} ({row['attack_type']}) was missed by the rules, {how}.")
+            how = (
+                "but the anomaly model flagged it"
+                if row["detected_by_anomaly"]
+                else "and so did the anomaly model"
+            )
+            notes.append(
+                f"{row['attack_id']} ({row['attack_type']}) was missed by the rules, {how}."
+            )
     return EvaluationResult(
         events=len(events),
         attacks=len(attacks),
@@ -241,25 +250,44 @@ def to_markdown(result: EvaluationResult, command: str) -> str:
             f"| {row['attack_type']} | {row['attacks']} | {row['detected_by_rules']} "
             f"| {row['detected_by_anomaly']} |"
         )
-    lines += ["", "## Per rule (alert precision)", "", "| Rule | Alerts | True positive | False positive | Precision |", "|---|---|---|---|---|"]
+    lines += [
+        "",
+        "## Per rule (alert precision)",
+        "",
+        "| Rule | Alerts | True positive | False positive | Precision |",
+        "|---|---|---|---|---|",
+    ]
     for row in r.rule_precision:
         prec = "-" if row["precision"] is None else f"{row['precision']:.0%}"
         lines.append(
             f"| {row['rule_id']} | {row['alerts']} | {row['true_positive_alerts']} "
             f"| {row['false_positive_alerts']} | {prec} |"
         )
-    lines += ["", "## Isolation Forest: contamination trade-off", "", "| contamination | TP | FP | FN | Precision | Recall | F1 |", "|---|---|---|---|---|---|---|"]
+    lines += [
+        "",
+        "## Isolation Forest: contamination trade-off",
+        "",
+        "| contamination | TP | FP | FN | Precision | Recall | F1 |",
+        "|---|---|---|---|---|---|---|",
+    ]
     for row in r.contamination_sweep:
         lines.append(
             f"| {row['contamination']} | {row['tp']} | {row['fp']} | {row['fn']} "
             f"| {row['precision']:.0%} | {row['recall']:.0%} | {row['f1']:.2f} |"
         )
-    lines += ["", "## Every attack", "", "| ID | Type | Source | Expected rule(s) | Rules fired | Anomaly |", "|---|---|---|---|---|---|"]
+    lines += [
+        "",
+        "## Every attack",
+        "",
+        "| ID | Type | Source | Expected rule(s) | Rules fired | Anomaly |",
+        "|---|---|---|---|---|---|",
+    ]
     for row in r.attack_rows:
         fired = ", ".join(row["rules_fired"]) or "**none**"
+        anomaly = "yes" if row["detected_by_anomaly"] else "no"
         lines.append(
             f"| {row['attack_id']} | {row['attack_type']} | {row['src_ip']} "
-            f"| {', '.join(row['expected_rules'])} | {fired} | {'yes' if row['detected_by_anomaly'] else 'no'} |"
+            f"| {', '.join(row['expected_rules'])} | {fired} | {anomaly} |"
         )
     if r.notes:
         lines += ["", "## Misses", ""] + [f"- {n}" for n in r.notes]

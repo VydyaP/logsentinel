@@ -161,7 +161,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_report)
 
     p = sub.add_parser("evaluate", help="score detections against simulator labels")
-    p.add_argument("--logs", nargs="+", default=["data/samples/auth.log", "data/samples/access.log"])
+    p.add_argument(
+        "--logs", nargs="+", default=["data/samples/auth.log", "data/samples/access.log"]
+    )
     p.add_argument("--labels", default="data/samples/labels.csv")
     p.add_argument("--contamination", type=float, default=0.02)
     p.add_argument("--out", default="docs/EVALUATION.md")

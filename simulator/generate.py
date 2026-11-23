@@ -144,7 +144,9 @@ class Generator:
         port = self.port()
         if not valid:
             self.ssh(ts, host, f"Invalid user {user} from {ip} port {port}")
-            self.ssh(ts, host, f"Failed password for invalid user {user} from {ip} port {port} ssh2")
+            self.ssh(
+                ts, host, f"Failed password for invalid user {user} from {ip} port {port} ssh2"
+            )
         else:
             self.ssh(ts, host, f"Failed password for {user} from {ip} port {port} ssh2")
         self.ssh(
@@ -162,7 +164,9 @@ class Generator:
             f"Accepted {method} for {user} from {ip} port {port} ssh2"
             + (suffix if method == "publickey" else ""),
         )
-        self.ssh(ts, host, f"pam_unix(sshd:session): session opened for user {user}(uid=1001) by (uid=0)")
+        self.ssh(
+            ts, host, f"pam_unix(sshd:session): session opened for user {user}(uid=1001) by (uid=0)"
+        )
         end = ts + timedelta(minutes=self.rng.uniform(2, 90))
         self.ssh(end, host, f"Received disconnect from {ip} port {port}:11: disconnected by user")
         self.ssh(end, host, f"pam_unix(sshd:session): session closed for user {user}")
@@ -183,13 +187,17 @@ class Generator:
                     host = self.rng.choice(["bastion-01", "bastion-01", "app-01"])
                     if self.rng.random() < 0.08:  # a typo or two before getting it right
                         for i in range(self.rng.randint(1, 2)):
-                            self.failed_login(ts + timedelta(seconds=5 * i), host, homes[user], user, True)
+                            self.failed_login(
+                                ts + timedelta(seconds=5 * i), host, homes[user], user, True
+                            )
                         ts += timedelta(seconds=15)
                     method = "publickey" if self.rng.random() < 0.7 else "password"
                     self.successful_login(ts, host, homes[user], user, method)
         # Unlabelled on-call work at night: these are real false positives for SSH-004.
         for user in ["ops", "karthik"]:
-            ts = self.start + timedelta(days=self.rng.randrange(self.days), hours=self.rng.uniform(17, 20))
+            ts = self.start + timedelta(
+                days=self.rng.randrange(self.days), hours=self.rng.uniform(17, 20)
+            )
             self.successful_login(ts, "app-01", homes[user], user, "publickey")
         # Internet background noise: many IPs, each trying a couple of passwords.
         for _ in range(60 * self.days):
@@ -197,7 +205,9 @@ class Generator:
             ts = self.random_time()
             for i in range(self.rng.randint(1, 3)):
                 user = self.rng.choice(ATTACK_USERNAMES)
-                self.failed_login(ts + timedelta(seconds=7 * i), "bastion-01", ip, user, user == "root")
+                self.failed_login(
+                    ts + timedelta(seconds=7 * i), "bastion-01", ip, user, user == "root"
+                )
 
     def normal_web(self) -> None:
         visitors_per_day = 220
@@ -206,8 +216,10 @@ class Generator:
                 ip = self.fresh_ip("100.64") if self.rng.random() < 0.8 else self.fresh_ip("100.65")
                 ua = self.rng.choice(BROWSER_UAS)
                 # Most traffic during Indian daytime; some round the clock.
-                ts = self.business_time(day) if self.rng.random() < 0.75 else (
-                    self.start + timedelta(days=day, hours=self.rng.uniform(0, 24))
+                ts = (
+                    self.business_time(day)
+                    if self.rng.random() < 0.75
+                    else (self.start + timedelta(days=day, hours=self.rng.uniform(0, 24)))
                 )
                 for _ in range(self.rng.randint(2, 12)):
                     roll = self.rng.random()
@@ -224,7 +236,9 @@ class Generator:
                         status = 404
                     elif self.rng.random() < 0.005:
                         status = 500
-                    method = "POST" if path in ("/login", "/cart") and self.rng.random() < 0.3 else "GET"
+                    method = (
+                        "POST" if path in ("/login", "/cart") and self.rng.random() < 0.3 else "GET"
+                    )
                     self.web(ts, ip, method, path, status, ua)
                     for asset in self.rng.sample(ASSETS, self.rng.randint(0, 3)):
                         self.web(ts + timedelta(seconds=0.3), ip, "GET", asset,
@@ -293,7 +307,9 @@ class Generator:
         if ts < self.start:
             ts += timedelta(days=1)
         self.successful_login(ts, "bastion-01", ip, "priya", "password")
-        self.label("off_hours_login", ip, "priya", ts, ts + timedelta(minutes=1), "T1078", "SSH-004", "ssh")
+        self.label(
+            "off_hours_login", ip, "priya", ts, ts + timedelta(minutes=1), "T1078", "SSH-004", "ssh"
+        )
 
     def low_and_slow(self) -> None:
         """Brute force slowed down to stay under thresholds. Rules are expected to miss this."""
@@ -307,12 +323,18 @@ class Generator:
 
     def web_scan(self, scanner_ua: bool) -> None:
         ip = self.fresh_ip("203.0.113")
-        ua = "Mozilla/5.00 (Nikto/2.5.0) (Evasions:None) (Test:Port Check)" if scanner_ua else self.rng.choice(BROWSER_UAS)
+        ua = (
+            "Mozilla/5.00 (Nikto/2.5.0) (Evasions:None) (Test:Port Check)"
+            if scanner_ua
+            else self.rng.choice(BROWSER_UAS)
+        )
         start = self.random_time()
         ts = start
         for _ in range(self.rng.randint(300, 600)):
             base = self.rng.choice(SCAN_PATHS)
-            path = base if self.rng.random() < 0.5 else f"{base.rstrip('/')}{self.rng.randint(1, 99)}"
+            path = (
+                base if self.rng.random() < 0.5 else f"{base.rstrip('/')}{self.rng.randint(1, 99)}"
+            )
             status = self.rng.choices([404, 403, 200, 301], weights=[85, 8, 4, 3])[0]
             self.web(ts, ip, "GET", path, status, ua)
             ts += timedelta(seconds=self.rng.uniform(0.2, 0.9))
@@ -327,7 +349,9 @@ class Generator:
         }[kind]
         ip = self.fresh_ip("203.0.113")
         use_tool = kind == "sqli" and self.rng.random() < 0.5
-        ua = "sqlmap/1.8.2#stable (https://sqlmap.org)" if use_tool else self.rng.choice(BROWSER_UAS)
+        ua = (
+            "sqlmap/1.8.2#stable (https://sqlmap.org)" if use_tool else self.rng.choice(BROWSER_UAS)
+        )
         start = self.random_time()
         ts = start
         targets = {"sqli": ["/products?id=", "/search?q=", "/api/items?sort="],
@@ -336,7 +360,9 @@ class Generator:
         for _ in range(self.rng.randint(8, 25)):
             # Mix of plain, URL-encoded and double-encoded payloads, like real tools send.
             payload = self.rng.choice(payloads)
-            encoded = quote(payload, safe="") if self.rng.random() < 0.6 else payload.replace(" ", "%20")
+            encoded = (
+                quote(payload, safe="") if self.rng.random() < 0.6 else payload.replace(" ", "%20")
+            )
             path = self.rng.choice(targets) + encoded
             status = self.rng.choices([400, 403, 500, 200], weights=[30, 30, 20, 20])[0]
             self.web(ts, ip, "GET", path, status, ua)
@@ -378,7 +404,9 @@ class Generator:
         return {"ssh_lines": len(ssh), "web_lines": len(web), "attacks": len(self.labels)}
 
 
-def generate(out: Path, days: int = 2, seed: int = 7, start: datetime | None = None) -> dict[str, int]:
+def generate(
+    out: Path, days: int = 2, seed: int = 7, start: datetime | None = None
+) -> dict[str, int]:
     """Generate the three files and return line counts."""
     if start is None:
         today = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)

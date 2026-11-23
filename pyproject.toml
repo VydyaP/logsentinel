@@ -34,7 +34,6 @@ dev = [
     "pre-commit>=3.7",
     "types-PyYAML",
     "types-Markdown",
-    "pandas-stubs",
 ]
 
 [project.scripts]
@@ -61,7 +60,11 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S", "B"]
+"tests/**" = ["S", "B", "E501"]
+"simulator/generate.py" = ["E501"]  # long lists of realistic payloads and user agents
+
+[tool.ruff.lint.isort]
+known-first-party = ["logsentinel", "simulator", "conftest"]
 
 [tool.mypy]
 python_version = "3.11"

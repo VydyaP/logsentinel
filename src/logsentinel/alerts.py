@@ -168,7 +168,9 @@ def update_alert(
             alert.acknowledged_at = now
         alert.resolved_at = now if new_status.is_closed else None
         alert.notes.append(
-            AlertNote(author=author, body=f"Status: {old_status} -> {new_status.value}", created_at=now)
+            AlertNote(
+                author=author, body=f"Status: {old_status} -> {new_status.value}", created_at=now
+            )
         )
     if assignee is not None and assignee != alert.assignee:
         alert.assignee = assignee or None
@@ -227,11 +229,13 @@ def sla_report(session: Session, now: datetime | None = None) -> list[SlaRow]:
     """
     now = now or utcnow()
     rows = session.execute(
-        select(Alert.severity, Alert.status, Alert.created_at, Alert.acknowledged_at, Alert.resolved_at)
+        select(
+            Alert.severity, Alert.status, Alert.created_at, Alert.acknowledged_at, Alert.resolved_at
+        )
     ).all()
     df = pd.DataFrame(rows, columns=["severity", "status", "created", "acked", "resolved"])
     for col in ("created", "acked", "resolved"):
-        df[col] = pd.to_datetime(df[col], utc=True)
+        df[col] = pd.to_datetime(df[col], utc=True).astype("datetime64[ns, UTC]")
     now_ts = pd.Timestamp(now)
     report = []
     for severity in reversed(SEVERITY_ORDER):

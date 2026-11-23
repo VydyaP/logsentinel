@@ -2,7 +2,7 @@
 
 Example line::
 
-    203.0.113.7 - - [20/Nov/2026:03:14:15 +0000] "GET /index.php?id=1 HTTP/1.1" 200 512 "-" "curl/8.4"
+    203.0.113.7 - - [20/Nov/2026:03:14:15 +0000] "GET /a?id=1 HTTP/1.1" 200 512 "-" "curl/8.4"
 """
 
 from __future__ import annotations

@@ -65,7 +65,7 @@ class Base(DeclarativeBase):
     pass
 
 
-class Severity(str, enum.Enum):
+class Severity(enum.StrEnum):
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -79,7 +79,7 @@ class Severity(str, enum.Enum):
 SEVERITY_ORDER = [Severity.LOW, Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL]
 
 
-class AlertStatus(str, enum.Enum):
+class AlertStatus(enum.StrEnum):
     NEW = "New"
     INVESTIGATING = "Investigating"
     RESOLVED = "Resolved"

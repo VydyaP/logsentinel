@@ -21,9 +21,7 @@ def make_engine(url: str | None = None) -> Engine:
     """
     url = normalize_db_url(url or get_settings().database_url)
     if url.startswith("sqlite") and ":memory:" in url:
-        return create_engine(
-            url, connect_args={"check_same_thread": False}, poolclass=StaticPool
-        )
+        return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
     if url.startswith("sqlite"):
         return create_engine(url, connect_args={"check_same_thread": False})
     return create_engine(url, pool_pre_ping=True)

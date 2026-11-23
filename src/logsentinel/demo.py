@@ -24,8 +24,12 @@ ANALYSTS = ["analyst-1", "analyst-2", "analyst-3"]
 
 def reset(session: Session) -> None:
     """Delete all data (keeps the tables)."""
-    for table in (AlertNote.__table__, alert_events, Alert.__table__, Incident.__table__, Event.__table__):
-        session.execute(delete(table))
+    # Children first, so foreign keys are never violated.
+    session.execute(delete(AlertNote))
+    session.execute(delete(alert_events))
+    session.execute(delete(Alert))
+    session.execute(delete(Incident))
+    session.execute(delete(Event))
     session.flush()
 
 
@@ -49,24 +53,43 @@ def simulate_triage(session: Session, labelled_entities: set[str], seed: int = 7
         ack_factor = rng.uniform(0.1, 0.9) if rng.random() > 0.17 else rng.uniform(1.2, 3)
         ack_at = alert.created_at + ack_target * ack_factor
         analyst = rng.choice(ANALYSTS)
-        update_alert(session, alert, status=AlertStatus.INVESTIGATING.value, assignee=analyst,
-                     author=analyst, now=ack_at)  # fmt: skip
-        update_alert(session, alert, note="[simulated triage] Reviewed raw log lines and source history.",
-                     author=analyst, now=ack_at + timedelta(minutes=3))  # fmt: skip
+        update_alert(
+            session,
+            alert,
+            status=AlertStatus.INVESTIGATING.value,
+            assignee=analyst,
+            author=analyst,
+            now=ack_at,
+        )
+        update_alert(
+            session,
+            alert,
+            note="[simulated triage] Reviewed raw log lines and source history.",
+            author=analyst,
+            now=ack_at + timedelta(minutes=3),
+        )
         if roll < 0.35:
             continue  # still being investigated
         res_factor = rng.uniform(0.2, 0.9) if rng.random() > 0.15 else rng.uniform(1.1, 2)
         resolved_at = alert.created_at + resolve_target * res_factor
         if alert.entity in labelled_entities:
-            status, note = AlertStatus.RESOLVED.value, "[simulated triage] Confirmed malicious; source blocked."
+            status, note = (
+                AlertStatus.RESOLVED.value,
+                "[simulated triage] Confirmed malicious; source blocked.",
+            )
         else:
-            status, note = AlertStatus.FALSE_POSITIVE.value, "[simulated triage] Benign: known internal tool / planned work."
+            status, note = (
+                AlertStatus.FALSE_POSITIVE.value,
+                "[simulated triage] Benign: known internal tool / planned work.",
+            )
         update_alert(session, alert, status=status, note=note, author=analyst, now=resolved_at)
     session.flush()
     return len(alerts)
 
 
-def seed_demo(session: Session, days: int = 2, seed: int = 7, out_dir: Path | None = None) -> dict[str, int]:
+def seed_demo(
+    session: Session, days: int = 2, seed: int = 7, out_dir: Path | None = None
+) -> dict[str, int]:
     """Generate logs, ingest them, run detection and simulate triage."""
     from simulator.generate import generate
 
