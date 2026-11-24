@@ -103,6 +103,13 @@ These shouldn't happen: every create first searches for `correlation_id`. If you
 - Sync is one-way (ServiceNow → LogSentinel). Closing an alert in LogSentinel does
   not close the ticket; close it in ServiceNow.
 
+### "Data Policy Exception: Resolution code is mandatory"
+
+You get this when resolving a ticket through the API (for example a script or test) without a valid
+`close_code`. Newer releases use different labels from older ones (e.g. *Resolved – Fixed by Caller*),
+and an unknown value counts as empty. Send the label with `sysparm_input_display_value=true`, or
+resolve in the UI. LogSentinel itself never resolves tickets: it only reads their state.
+
 ### Tickets not created at all
 
 - `TICKETING_PROVIDER` must be `servicenow`. If it's set but a URL or credential is
