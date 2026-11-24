@@ -122,5 +122,6 @@ def test_noop_provider_implements_interface(incident_alert):
     assert ref.ticket_id == f"LOCAL-{incident_alert.incident_id}"
     provider.update_incident(incident_alert.incident, "note")
     assert provider.get_status(ref.ticket_id) == "unknown"
+    assert provider.get_statuses([ref.ticket_id]) == {}
     with pytest.raises(ValueError):
-        get_provider("servicenow")
+        get_provider("jira")

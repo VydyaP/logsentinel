@@ -120,6 +120,10 @@ class IncidentOut(BaseModel):
     first_seen: datetime
     last_seen: datetime
     external_ref: str | None
+    ticket_provider: str | None = None
+    ticket_number: str | None = None
+    ticket_url: str | None = None
+    ticket_state: str | None = None
     alert_count: int
 
 

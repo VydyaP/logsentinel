@@ -23,6 +23,14 @@ T0 = datetime(2026, 11, 16, 6, 0, tzinfo=UTC)  # 11:30 IST, inside business hour
 _ids = itertools.count(1)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_ticketing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Unit tests never talk to a real ITSM instance, whatever the shell has set."""
+    monkeypatch.setenv("TICKETING_PROVIDER", "noop")
+    for var in ("SERVICENOW_INSTANCE_URL", "SERVICENOW_USERNAME", "SERVICENOW_PASSWORD"):
+        monkeypatch.delenv(var, raising=False)
+
+
 @pytest.fixture
 def engine() -> Engine:
     eng = make_engine("sqlite:///:memory:")

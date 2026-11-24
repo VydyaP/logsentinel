@@ -29,6 +29,7 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-cov>=5.0",
+    "respx>=0.21",
     "ruff>=0.6",
     "mypy>=1.10",
     "pre-commit>=3.7",
@@ -83,5 +84,8 @@ disallow_untyped_decorators = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["integration: needs a real PostgreSQL database (set DATABASE_URL)"]
+markers = [
+    "integration: needs a real PostgreSQL database (set DATABASE_URL)",
+    "servicenow_live: talks to a real ServiceNow instance (needs SERVICENOW_* credentials)",
+]
 addopts = "-q"

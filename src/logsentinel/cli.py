@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from logsentinel.config import PROJECT_ROOT, get_settings
+from logsentinel.config import PROJECT_ROOT, get_settings, load_dotenv_file
 from logsentinel.db import get_engine, get_sessionmaker, session_scope
 
 
@@ -127,6 +127,97 @@ def cmd_demo_seed(args: argparse.Namespace) -> None:
     print(f"Demo data loaded: {counts}")
 
 
+def cmd_sync_tickets(args: argparse.Namespace) -> None:
+    """Poll the ticketing system and close alerts whose ticket was resolved there."""
+    import time
+
+    from logsentinel.ticket_sync import sync_ticket_status
+    from logsentinel.ticketing import get_provider
+
+    provider = get_provider()
+    print(f"Ticket sync using provider: {provider.name}")
+    while True:
+        with session_scope() as session:
+            result = sync_ticket_status(session, provider)
+        closed = ", ".join(f"INC-{i:05d}" for i in result.closed_incidents) or "none"
+        retried = ", ".join(f"INC-{i:05d}" for i in result.retried)
+        print(
+            f"checked {result.checked} ticket(s); closed in LogSentinel: {closed}"
+            + (f"; tickets opened on retry: {retried}" if retried else "")
+            + (f"; ERROR: {result.error}" if result.error else "")
+        )
+        if not args.every:
+            if result.error:
+                sys.exit(1)
+            return
+        time.sleep(args.every)
+
+
+def cmd_ticketing_check(args: argparse.Namespace) -> None:
+    """Check that the configured ticketing provider is reachable and the login works."""
+    from logsentinel.ticketing import TicketingError, get_provider
+
+    settings = get_settings()
+    provider = get_provider()
+    print(f"TICKETING_PROVIDER={settings.ticketing_provider} -> using {provider.name}")
+    if provider.name != "servicenow":
+        print("Nothing to check for the noop provider.")
+        return
+    from logsentinel.servicenow import ServiceNowProvider
+
+    assert isinstance(provider, ServiceNowProvider)
+    print(f"Instance: {provider.instance_url}")
+    try:
+        provider.find_by_correlation_id("logsentinel-connectivity-check")
+    except TicketingError as exc:
+        print(f"FAILED: {exc}")
+        sys.exit(1)
+    print("OK: authenticated and can read the incident table.")
+
+
+def cmd_simulate_attack(args: argparse.Namespace) -> None:
+    """Write a fresh SSH brute-force burst (timestamped now) and run detection on it."""
+    from datetime import UTC, datetime
+
+    from logsentinel.ingest import ingest_lines
+    from logsentinel.pipeline import run_detection
+
+    now = datetime.now(UTC).replace(microsecond=0)
+    start = now - timedelta(seconds=args.attempts * 3 + 10)
+    lines = []
+    for i in range(args.attempts):
+        ts = start + timedelta(seconds=i * 3)
+        user = args.user if i % 3 else "root"
+        lines.append(
+            f"{ts.isoformat()} bastion sshd[4242]: Failed password for {user} "
+            f"from {args.ip} port {40000 + i} ssh2"
+        )
+    if args.success:
+        ts = start + timedelta(seconds=args.attempts * 3 + 5)
+        lines.append(
+            f"{ts.isoformat()} bastion sshd[4242]: Accepted password for {args.user} "
+            f"from {args.ip} port 40999 ssh2"
+        )
+    with session_scope() as session:
+        stats = ingest_lines(
+            session, lines, "ssh", source_file=f"simulated-{now:%Y%m%dT%H%M%S}.log"
+        )
+        run = run_detection(session, lookback=timedelta(minutes=30), use_anomaly=False)
+        print(f"Ingested {stats.inserted} simulated events from {args.ip}.")
+        for alert in run.new_alerts:
+            inc = alert.incident
+            ticket = (inc.ticket_number or inc.external_ref) if inc else None
+            print(
+                f"  alert #{alert.id} {alert.rule_id} [{alert.severity}] -> "
+                f"INC-{alert.incident_id or 0:05d} ticket={ticket or 'none'}"
+            )
+        if not run.new_alerts:
+            print(
+                "No new alerts: these events fall inside an attack already detected "
+                "(same rule window). Use --success, or another --ip for a fresh incident."
+            )
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="logsentinel", description="SOC-style log monitoring")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -180,10 +271,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--reset", action="store_true", help="delete existing data first")
     p.add_argument("--if-empty", action="store_true", help="do nothing if events already exist")
     p.set_defaults(func=cmd_demo_seed)
+
+    p = sub.add_parser("sync-tickets", help="pull ticket status from ServiceNow into LogSentinel")
+    p.add_argument("--every", type=float, help="keep running, polling every N seconds")
+    p.set_defaults(func=cmd_sync_tickets)
+
+    p = sub.add_parser("ticketing-check", help="test the ticketing connection and credentials")
+    p.set_defaults(func=cmd_ticketing_check)
+
+    p = sub.add_parser("simulate-attack", help="inject a live SSH brute force and detect it")
+    p.add_argument("--ip", default="203.0.113.77", help="attacker IP (documentation range)")
+    p.add_argument("--user", default="admin")
+    p.add_argument("--attempts", type=int, default=12)
+    p.add_argument("--success", action="store_true", help="end with a successful login")
+    p.set_defaults(func=cmd_simulate_attack)
     return parser
 
 
 def main(argv: list[str] | None = None) -> None:
+    load_dotenv_file()  # local .env, if present; real environment variables win
     args = build_parser().parse_args(argv)
     logging.basicConfig(
         level=logging.INFO if args.verbose else logging.WARNING,

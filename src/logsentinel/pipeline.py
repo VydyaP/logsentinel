@@ -15,8 +15,9 @@ from logsentinel.alerts import save_detections
 from logsentinel.config import get_settings
 from logsentinel.detection import detect_anomalies, load_rules, run_rules
 from logsentinel.detection.base import EVENT_COLUMNS, Detection
-from logsentinel.models import Alert, Event, Incident
+from logsentinel.models import Alert, Event
 from logsentinel.notify import notify
+from logsentinel.ticket_sync import push_tickets
 from logsentinel.ticketing import TicketingProvider, get_provider
 
 log = logging.getLogger(__name__)
@@ -74,7 +75,6 @@ def run_detection(
         detections += detect_anomalies(events, contamination=contamination).detections
     run.detections = len(detections)
 
-    known_incidents = set(session.scalars(select(Incident.id)))
     run.new_alerts = save_detections(
         session,
         detections,
@@ -82,12 +82,14 @@ def run_detection(
         created_at=created_at,
     )
 
-    provider = provider or get_provider()
-    for incident in {a.incident for a in run.new_alerts if a.incident is not None}:
-        if incident.id not in known_incidents and incident.external_ref is None:
-            incident.external_ref = provider.create_incident(incident).ticket_id
-        else:
-            provider.update_incident(incident, comment="New alerts added")
+    if run.new_alerts:
+        owned = provider is None
+        provider = provider or get_provider(settings=settings)
+        try:
+            push_tickets(run.new_alerts, provider, settings)
+        finally:
+            if owned and hasattr(provider, "close"):
+                provider.close()
 
     if send_notifications:
         run.notified = notify(run.new_alerts, settings)

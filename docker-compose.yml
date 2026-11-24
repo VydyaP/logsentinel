@@ -1,4 +1,5 @@
-# Local stack: PostgreSQL + REST API + Streamlit dashboard + one-shot demo data loader.
+# Local stack: PostgreSQL + REST API + Streamlit dashboard + one-shot demo data loader
+# (+ optional ServiceNow ticket-sync job with --profile servicenow).
 #   docker compose up --build
 # Dashboard: http://localhost:8501   API docs: http://localhost:8000/docs
 x-app-env: &app-env
@@ -11,6 +12,14 @@ x-app-env: &app-env
   SMTP_PASSWORD: ${SMTP_PASSWORD:-}
   ALERT_EMAIL_FROM: ${ALERT_EMAIL_FROM:-}
   ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+  DASHBOARD_URL: ${DASHBOARD_URL:-http://localhost:8501}
+  TICKETING_PROVIDER: ${TICKETING_PROVIDER:-noop}
+  TICKET_MIN_SEVERITY: ${TICKET_MIN_SEVERITY:-high}
+  SERVICENOW_INSTANCE_URL: ${SERVICENOW_INSTANCE_URL:-}
+  SERVICENOW_USERNAME: ${SERVICENOW_USERNAME:-}
+  SERVICENOW_PASSWORD: ${SERVICENOW_PASSWORD:-}
+  SERVICENOW_CATEGORY: ${SERVICENOW_CATEGORY:-network}
+  SERVICENOW_ASSIGNMENT_GROUP: ${SERVICENOW_ASSIGNMENT_GROUP:-}
 
 services:
   db:
@@ -52,6 +61,17 @@ services:
     command: logsentinel demo-seed --if-empty
     environment: *app-env
     restart: "no"
+    depends_on:
+      api: { condition: service_healthy }
+
+  # Scheduled job: pulls ticket state from ServiceNow every 60 s and closes alerts
+  # whose ticket was resolved there. Opt-in: docker compose --profile servicenow up
+  ticket-sync:
+    build: .
+    command: logsentinel sync-tickets --every 60
+    environment: *app-env
+    profiles: ["servicenow"]
+    restart: unless-stopped
     depends_on:
       api: { condition: service_healthy }
 
