@@ -36,7 +36,7 @@ flowchart LR
     R & M --> D[Detections]
     D --> AL[(alerts + incidents<br/>dedupe, grouping)]
     AL --> N[Slack / e-mail<br/>high+critical]
-    AL --> T[TicketingProvider<br/>no-op, ServiceNow later]
+    AL --> T[TicketingProvider<br/>no-op or ServiceNow]
     AL --> UI[Streamlit dashboard<br/>triage, SLA]
     AL --> API[FastAPI<br/>REST]
     AL --> REP[Incident report<br/>Markdown + PDF]
@@ -53,6 +53,7 @@ flowchart LR
 | `alerts.py` | Store detections (fingerprint dedupe), group into incidents, triage transitions, SLA maths. |
 | `pipeline.py` | Orchestrates one detection run. |
 | `notify.py`, `ticketing.py` | Outbound integrations, both optional and failure-tolerant. |
+| `servicenow.py`, `ticket_sync.py` | ServiceNow Table API provider; opening/updating tickets after detection and the status-sync job. |
 | `report.py` | Jinja2 Markdown report, converted to PDF with fpdf2. |
 | `api.py`, `cli.py`, `dashboard/app.py` | Three front doors over the same core functions. |
 
@@ -147,9 +148,13 @@ analysts a shared vocabulary, lets reports show which tactics an attacker reache
 - **Notifications** (Slack webhook, SMTP) are configured only through environment
   variables. A failed notification is logged and never blocks detection.
 - **Ticketing** is a `TicketingProvider` protocol with `create_incident`,
-  `update_incident` and `get_status`. The no-op default returns `LOCAL-<id>`.
-  A ServiceNow provider would call the Table API (`/api/now/table/incident`) and
-  store the returned `sys_id` in `incidents.external_ref`; nothing else changes.
+  `update_incident`, `get_status` and `get_statuses`. The no-op default returns
+  `LOCAL-<id>`. The ServiceNow provider uses the Table API
+  (`/api/now/table/incident`), stores the `sys_id` in `incidents.external_ref`
+  and the number/state/link in `ticket_*` columns. Only High/Critical incidents
+  are ticketed; a `correlation_id` makes creation idempotent; a scheduled job
+  syncs Resolved/Closed back. Full description, mapping and sequence diagram:
+  [README: ServiceNow integration](../README.md#servicenow-integration).
 
 ## Security of the tool itself
 
