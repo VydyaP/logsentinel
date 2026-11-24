@@ -196,7 +196,12 @@ a High or Critical incident opens a ServiceNow incident, new related alerts are
 added as work notes, and when the ticket is resolved in ServiceNow, LogSentinel
 closes its alerts.
 
-<!-- SERVICENOW_SCREENSHOT -->
+<table>
+<tr><td><img src="docs/images/servicenow-incident.png" alt="ServiceNow incident INC0010002 opened by LogSentinel: P1 Critical, MITRE technique, sample log lines, dashboard link and correlation ID"></td></tr>
+<tr><td align="center">A real incident opened by LogSentinel in a ServiceNow developer instance. The description is written when the ticket is created; later alerts arrive as work notes.</td></tr>
+<tr><td><img src="docs/images/servicenow-escalation.png" alt="ServiceNow activity: the integration user raised impact and priority from P2 to P1"></td></tr>
+<tr><td align="center">Opened as P2 by the brute force, raised to P1 when the attacker logged in; every change is made by the least-privilege integration user.</td></tr>
+</table>
 
 ```mermaid
 sequenceDiagram
