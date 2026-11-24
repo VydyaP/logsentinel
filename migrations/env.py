@@ -28,6 +28,13 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # logsentinel.db.migrate() passes its own connection; the alembic CLI does not.
+    shared = config.attributes.get("connection")
+    if shared is not None:
+        context.configure(connection=shared, target_metadata=target_metadata, render_as_batch=True)
+        with context.begin_transaction():
+            context.run_migrations()
+        return
     engine = make_engine()
     with engine.connect() as connection:
         context.configure(

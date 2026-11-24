@@ -13,7 +13,7 @@ from pathlib import Path
 
 from sqlalchemy import select
 
-from logsentinel.config import PROJECT_ROOT, get_settings, load_dotenv_file
+from logsentinel.config import get_settings, load_dotenv_file
 from logsentinel.db import get_engine, get_sessionmaker, session_scope
 
 
@@ -25,12 +25,9 @@ def _duration(text: str) -> timedelta:
 
 def cmd_init_db(args: argparse.Namespace) -> None:
     """Create or upgrade the database schema with Alembic."""
-    from alembic import command
-    from alembic.config import Config
+    from logsentinel.db import migrate
 
-    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
-    cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
-    command.upgrade(cfg, "head")
+    migrate()
     print("Database schema is up to date.")
 
 

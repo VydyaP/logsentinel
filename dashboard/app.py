@@ -38,7 +38,7 @@ from sqlalchemy import func, select  # noqa: E402
 
 from logsentinel.alerts import SLA_TARGETS, sla_report, update_alert  # noqa: E402
 from logsentinel.config import get_settings  # noqa: E402
-from logsentinel.db import get_engine, init_db, session_scope  # noqa: E402
+from logsentinel.db import migrate, session_scope  # noqa: E402
 from logsentinel.detection.rules import load_rules  # noqa: E402
 from logsentinel.models import Alert, AlertStatus, Event, Incident  # noqa: E402
 
@@ -59,9 +59,18 @@ settings = get_settings()
 
 @st.cache_resource
 def _bootstrap() -> bool:
-    """Make sure tables exist when running on a local SQLite file."""
-    if get_engine().dialect.name == "sqlite":
-        init_db()
+    """Create the tables or apply pending migrations (idempotent, once per process).
+
+    This keeps a hosted demo database in step with the code after a deploy.
+    """
+    try:
+        migrate()
+    except Exception as exc:
+        st.error(
+            f"Could not create/upgrade the database schema: {type(exc).__name__}. "
+            "Run `logsentinel init-db` against this database."
+        )
+        st.stop()
     return True
 
 
