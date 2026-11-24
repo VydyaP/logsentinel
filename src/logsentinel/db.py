@@ -10,7 +10,7 @@ from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from logsentinel.config import get_settings, normalize_db_url
+from logsentinel.config import PROJECT_ROOT, get_settings, normalize_db_url
 
 
 def make_engine(url: str | None = None) -> Engine:
@@ -56,3 +56,25 @@ def init_db(engine: Engine | None = None) -> None:
     from logsentinel.models import Base
 
     Base.metadata.create_all(engine or get_engine())
+
+
+def migrate(engine: Engine | None = None) -> None:
+    """Bring any database to the latest Alembic revision. Safe to call on every start.
+
+    Databases created with :func:`init_db` (``create_all``) have no Alembic version
+    table; they are stamped with the revision their columns match, then upgraded.
+    """
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import inspect
+
+    cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(PROJECT_ROOT / "migrations"))
+    with (engine or get_engine()).begin() as conn:
+        cfg.attributes["connection"] = conn
+        inspector = inspect(conn)
+        tables = set(inspector.get_table_names())
+        if "alembic_version" not in tables and "incidents" in tables:
+            columns = {c["name"] for c in inspector.get_columns("incidents")}
+            command.stamp(cfg, "head" if "ticket_provider" in columns else "0001")
+        command.upgrade(cfg, "head")
