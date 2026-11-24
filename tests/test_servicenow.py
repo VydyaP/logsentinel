@@ -7,12 +7,13 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import httpx
 import pytest
 import respx
 
+from conftest import T0
 from logsentinel.config import Settings
 from logsentinel.ingest import ingest_lines
 from logsentinel.models import Alert, AlertStatus, Incident
@@ -36,7 +37,9 @@ BASE = "https://dev00000.service-now.com"
 TABLE = f"{BASE}/api/now/table/incident"
 SECRET = "s3cret-Passw0rd!"
 SYS_ID = "a" * 32
-NOW = datetime.now(UTC).replace(microsecond=0)
+# Fixed time inside IST business hours: with wall-clock time, runs after 21:00 IST
+# also fire SSH-004 (off-hours login) and open a second incident.
+NOW = T0 + timedelta(hours=1)  # 12:30 IST
 
 
 def record(state: str = "1", sys_id: str = SYS_ID, number: str = "INC0010001", **extra):
