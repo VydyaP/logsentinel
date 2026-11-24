@@ -14,3 +14,7 @@ One page per detection. Each answers: what does it mean, how do I verify it, how
 | [WEB-004 Path traversal attempt](WEB-004-path-traversal.md) | High | T1190 Exploit Public-Facing Application |
 | [WEB-005 Known attack tool user agent](WEB-005-scanner-user-agent.md) | Low | T1595.002 Active Scanning: Vulnerability Scanning |
 | [ANOM-001 Anomalous behaviour (Isolation Forest)](ANOM-001-anomaly.md) | Medium | none (behavioural) |
+
+Operational runbooks:
+
+- [ServiceNow integration](servicenow-integration.md): auth errors, rate limits, a hibernating developer instance, duplicate or missing tickets.

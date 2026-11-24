@@ -4,7 +4,7 @@
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue)
 ![License: MIT](https://img.shields.io/badge/license-MIT-green)
 
-**A small Security Operations Center (SOC) tool that watches SSH and web server logs, detects attacks with MITRE ATT&CK-mapped rules and an anomaly model, and helps an analyst triage, track SLAs and write incident reports.**
+**A small Security Operations Center (SOC) tool that watches SSH and web server logs, detects attacks with MITRE ATT&CK-mapped rules and an anomaly model, opens and tracks incidents in ServiceNow, and helps an analyst triage, track SLAs and write incident reports.**
 
 **Live demo:** [https://vydyap-logsentinel-dashboardapp-wagokk.streamlit.app/](https://vydyap-logsentinel-dashboardapp-wagokk.streamlit.app/) · [Design](docs/DESIGN.md) · [Evaluation](docs/EVALUATION.md) · [Runbooks](docs/runbooks/README.md)
 
@@ -24,7 +24,7 @@
 | **Triage** | Status (New / Investigating / Resolved / False positive), assignee, notes with an audit trail, **time-to-acknowledge and time-to-resolve** against per-severity SLA targets. |
 | **Report** | One click (or `logsentinel report <id>`) produces a **Markdown + PDF incident report**: summary, timeline, affected assets, indicators, MITRE mapping, recommended actions, evidence. |
 | **Respond** | A [runbook](docs/runbooks/README.md) per detection: what it means, how to verify, contain and close. |
-| **Integrate** | A `TicketingProvider` interface (`create_incident`, `update_incident`, `get_status`) ready for a ServiceNow integration. |
+| **Ticket** | High/critical incidents **open a ServiceNow incident** through the REST Table API (deduplicated by correlation ID), new alerts become work notes, and a sync job closes alerts when the ticket is resolved. [Details](#servicenow-integration). Pluggable `TicketingProvider` interface; `noop` by default. |
 
 <table>
 <tr>
@@ -52,7 +52,7 @@ flowchart LR
     AL --> DASH[Streamlit dashboard]
     AL --> API[FastAPI]
     AL --> NOTIFY[Slack / e-mail]
-    AL --> TICKET[TicketingProvider]
+    AL --> TICKET[TicketingProvider] <--> SN[(ServiceNow<br/>incident table)]
     AL --> REPORT[Markdown + PDF report]
 ```
 
@@ -134,13 +134,16 @@ logsentinel watch ./logs                           # tail a folder continuously
 logsentinel alerts --status New                    # list alerts
 logsentinel report 3 --out reports                 # INC-00003.md + .pdf
 logsentinel evaluate                               # regenerate docs/EVALUATION.md
+logsentinel simulate-attack --ip 203.0.113.77      # live SSH brute force (demo)
+logsentinel ticketing-check                        # test ServiceNow login
+logsentinel sync-tickets --every 60                # pull ticket status from ServiceNow
 python -m simulator.generate --out data/samples --days 2 --seed 7
 uvicorn logsentinel.api:app --reload               # REST API
 pytest                                             # tests (Postgres test runs if DATABASE_URL is Postgres)
 ```
 
 Configuration is by environment variables; see [.env.example](.env.example)
-(database URL, API key, Slack webhook, SMTP, notification threshold). Nothing is required.
+(database URL, API key, Slack webhook, SMTP, notification threshold, ServiceNow). Nothing is required.
 
 ## Add a new detection (no code)
 
@@ -186,6 +189,142 @@ fails until you do. Condition operators: exact value, list (any of), `regex`,
 
 Write endpoints require an `X-API-Key` header when `API_KEY` is set.
 
+## ServiceNow integration
+
+LogSentinel can open and track incidents in ServiceNow. **Detect → alert → ticket → resolve:**
+a High or Critical incident opens a ServiceNow incident, new related alerts are
+added as work notes, and when the ticket is resolved in ServiceNow, LogSentinel
+closes its alerts.
+
+<!-- SERVICENOW_SCREENSHOT -->
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant D as LogSentinel detection
+    participant P as ServiceNowProvider
+    participant SN as ServiceNow Table API
+    participant J as sync-tickets job
+    participant A as Analyst (ServiceNow)
+
+    D->>D: SSH-001 brute force -> incident INC-00042 (high)
+    D->>P: create_incident(INC-00042)
+    P->>SN: GET /api/now/table/incident?correlation_id=logsentinel-INC-00042-...
+    SN-->>P: [] (no ticket yet)
+    P->>SN: POST /api/now/table/incident {short_description, impact=2, urgency=1, correlation_id, ...}
+    SN-->>P: 201 {sys_id, number: INC0010023, state: 1}
+    P-->>D: store sys_id, number, link, state
+    D->>D: SSH-003 login after failures joins INC-00042 (now critical)
+    D->>P: update_incident(work note)
+    P->>SN: PATCH /incident/{sys_id} {work_notes, impact=1, urgency=1}
+    A->>SN: Resolve INC0010023 (close code + notes)
+    loop every 60 s
+        J->>SN: GET /incident?sysparm_query=sys_idIN... (batched, paginated)
+        SN-->>J: state 6 (Resolved), close_code, close_notes
+    end
+    J->>D: alerts -> Resolved, note "Ticket INC0010023 is Resolved in servicenow: ..."
+```
+
+### Field mapping
+
+| ServiceNow field | Value from LogSentinel |
+|---|---|
+| `short_description` | `[LogSentinel][HIGH] SSH brute force (+1 more) from 203.0.113.77` |
+| `description` | Incident id and title, severity, source IP or user, first/last seen (UTC), every alert with rule id, MITRE ATT&CK technique, event count and time range, the first 5 raw log lines, a link back to the dashboard, the correlation ID |
+| `category` | `SERVICENOW_CATEGORY` (default `network`, one of the default PDI choices) |
+| `impact`, `urgency` | From severity (table below) |
+| `correlation_id` | `logsentinel-INC-00042-20261124T101500Z`: incident id + creation time, stable for the life of the incident |
+| `correlation_display` | `LogSentinel` |
+| `assignment_group` | `SERVICENOW_ASSIGNMENT_GROUP` (sys_id), optional |
+| `work_notes` | One note per detection run that adds alerts to the incident |
+
+### Severity mapping
+
+| LogSentinel severity | Impact | Urgency | Priority (default lookup) | Ticket? |
+|---|---|---|---|---|
+| Critical | 1 - High | 1 - High | **P1 Critical** | Yes |
+| High | 2 - Medium | 1 - High | **P2 High** | Yes |
+| Medium | 2 - Medium | 2 - Medium | P3 Moderate | Only if `TICKET_MIN_SEVERITY=medium` |
+| Low | 3 - Low | 3 - Low | P5 Planning | Only if `TICKET_MIN_SEVERITY=low` |
+
+ServiceNow works out the priority from impact and urgency itself. A High alert is
+urgent (an attack is in progress) but its impact isn't proven yet, so it gets impact 2.
+If the incident escalates (for example, the brute force ends in a successful login),
+the next update raises impact and urgency to 1/1.
+
+### Ticket state mapping (ServiceNow → LogSentinel)
+
+| ServiceNow state | LogSentinel |
+|---|---|
+| New (1), In Progress (2), On Hold (3) | Shown on the dashboard; alerts unchanged |
+| Resolved (6), Closed (7) | Open alerts → **Resolved**, with the close code and notes as an analyst note |
+| Canceled (8) | Open alerts → **False positive** |
+
+Status flows one way, from ServiceNow to LogSentinel. Once a ticket exists, the
+ticket is where the incident is worked.
+
+### How it stays reliable
+
+- **No duplicates.** Before every `POST`, the provider looks up the `correlation_id`.
+  If a crash happened between ServiceNow creating the ticket and LogSentinel
+  saving its `sys_id`, the next attempt finds that ticket and links it instead of
+  creating another. Re-running detection over the same logs creates no new alerts,
+  so it makes no HTTP calls at all.
+- **Retries:** 429 and 5xx responses, connect errors and timeouts are retried with exponential
+  backoff plus jitter (`Retry-After` is honoured). A `POST` is only retried when
+  the request certainly didn't arrive (429, 503, connect error), so a retry can't
+  create a second ticket.
+- **Clear errors:** a 401 names the credential variables, a 403 names the
+  missing role, and a hibernating developer instance (which returns HTML instead of JSON)
+  is reported as such. Auth errors are never retried, so the account doesn't get locked.
+- **Detection never waits on ServiceNow.** A failed create is logged and the incident
+  is marked *Create failed*. The sync job retries it.
+- **Logs:** one structured line per call (`method`, `path`, `status`, `attempt`,
+  `duration_ms`), never the `Authorization` header or the password.
+- **Least privilege:** a dedicated integration user with only the `itil` role,
+  marked *Web service access only*.
+
+### Setup
+
+1. Get a free Personal Developer Instance at [developer.servicenow.com](https://developer.servicenow.com)
+   (*Request instance*). Note its URL, e.g. `https://dev12345.service-now.com`.
+2. Sign in as `admin`, open **User Administration → Users → New**, and create the integration user:
+   - User ID `logsentinel.integration`. Tick **Web service access only**.
+     Leave **Password needs reset** unticked.
+   - Save, then **Set Password** and store the password somewhere safe.
+   - **Roles** tab → **Edit** → add **`itil`** only.
+3. Copy `.env.example` to `.env` and fill in:
+   ```
+   TICKETING_PROVIDER=servicenow
+   SERVICENOW_INSTANCE_URL=https://dev12345.service-now.com
+   SERVICENOW_USERNAME=logsentinel.integration
+   SERVICENOW_PASSWORD=...
+   ```
+   `.env` is git-ignored. The CLI and dashboard read it; real environment variables win.
+4. Check it: `logsentinel ticketing-check`.
+5. Run the sync job: `logsentinel sync-tickets --every 60`
+   (Docker: `docker compose --profile servicenow up`).
+
+Without these variables, `TICKETING_PROVIDER` defaults to `noop`: nothing leaves
+your machine, and CI runs the same way.
+
+### Try it (end to end)
+
+```bash
+logsentinel init-db
+logsentinel simulate-attack --ip 203.0.113.77             # 12 failed logins -> High -> one new ticket (P2)
+logsentinel detect --no-anomaly                           # run detection again -> 0 new alerts, no new ticket
+logsentinel simulate-attack --ip 203.0.113.77 --success   # attacker gets in -> work note, escalated to P1
+#   ... resolve the ticket in ServiceNow ...
+logsentinel sync-tickets                                  # LogSentinel alerts -> Resolved
+```
+
+Tests: `tests/test_servicenow.py` covers creation, deduplication, work notes,
+status sync, pagination, retry/backoff, 401/403, hibernation and secret-free logs,
+all with mocked HTTP (respx). `tests/live/test_servicenow_live.py` runs against a
+real instance only when credentials are present (`pytest tests/live -m servicenow_live`).
+CI skips it. Troubleshooting: [runbook](docs/runbooks/servicenow-integration.md).
+
 ## Limitations
 
 - Synthetic demo data; the evaluation shows behaviour on known patterns, not real-world accuracy.
@@ -196,7 +335,7 @@ Write endpoints require an `X-API-Key` header when `API_KEY` is set.
 
 ## Next steps
 
-- **ServiceNow integration** through the `TicketingProvider` interface (create/update incidents via the Table API).
+- A second ticketing provider (Jira or Slack) behind the same `TicketingProvider` interface; OAuth 2.0 for ServiceNow instead of basic auth.
 - Export rules as [Sigma](https://github.com/SigmaHQ/sigma) so they can run in Splunk, Microsoft Sentinel or Elastic.
 - Threat-intel enrichment (IP reputation, GeoIP) on alerts.
 - More sources: Windows Security events, cloud audit logs (AWS CloudTrail).
