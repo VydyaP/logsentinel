@@ -22,6 +22,10 @@ for path in (ROOT / "src", ROOT):  # so it runs without `pip install -e .` (e.g.
     if str(path) not in sys.path:
         sys.path.insert(0, str(path))
 
+from logsentinel.config import load_dotenv_file  # noqa: E402
+
+load_dotenv_file()  # local .env (e.g. ServiceNow settings); real environment variables win
+
 # Streamlit Community Cloud passes secrets via st.secrets; copy into the environment
 # before the package reads its settings.
 try:
@@ -369,7 +373,25 @@ def page_incidents() -> None:
     from logsentinel.report import generate_report
 
     st.title("Incidents")
-    st.caption("Alerts from the same source within the grouping window form one incident.")
+    st.caption(
+        "Alerts from the same source within the grouping window form one incident. "
+        f"High/critical incidents open a ticket (provider: **{settings.ticketing_provider}**)."
+    )
+    if settings.ticketing_provider != "noop" and st.button(
+        "Sync ticket status now", disabled=settings.read_only
+    ):
+        from logsentinel.ticket_sync import sync_ticket_status
+        from logsentinel.ticketing import get_provider
+
+        with st.spinner("Polling the ticketing system..."), session_scope() as s:
+            result = sync_ticket_status(s, get_provider())
+        if result.error:
+            st.error(f"Sync failed: {result.error}")
+        else:
+            st.success(
+                f"Checked {result.checked} ticket(s); "
+                f"{len(result.closed_incidents)} incident(s) closed from the ticket."
+            )
     with session_scope() as s:
         incidents = s.scalars(select(Incident).order_by(Incident.last_seen.desc())).all()
         rows = [
@@ -382,11 +404,16 @@ def page_incidents() -> None:
                 "alerts": len(i.alerts),
                 "first seen": i.first_seen,
                 "last seen": i.last_seen,
-                "ticket": i.external_ref,
+                "ticket": i.ticket_url or None,
+                "ticket no.": i.ticket_number or i.external_ref,
+                "ticket state": i.ticket_state,
             }
             for i in incidents
         ]
     df = pd.DataFrame(rows)
+    if df.empty:
+        st.info("No incidents yet.")
+        return
     event = st.dataframe(
         df.drop(columns=["id"]),
         hide_index=True,
@@ -396,13 +423,26 @@ def page_incidents() -> None:
         column_config={
             "first seen": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm"),
             "last seen": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm"),
+            "ticket": st.column_config.LinkColumn(
+                "ticket", help="Open the ticket in ServiceNow", display_text="open ↗"
+            ),
         },
     )
     selected = event.selection.rows if event and event.selection else []
-    if not selected:
+    incident_id: int | None = int(df.iloc[selected[0]]["id"]) if selected else None
+    # Deep link from a ServiceNow ticket: ?page=Incidents&incident=12
+    requested_incident = st.query_params.get("incident", "")
+    if incident_id is None and requested_incident.isdigit():
+        incident_id = int(requested_incident)
+    if incident_id is None or incident_id not in set(df["id"]):
         st.info("Select an incident to see its alerts and download the report.")
         return
-    incident_id = int(df.iloc[selected[0]]["id"])
+    ticket = df[df["id"] == incident_id].iloc[0]
+    if ticket["ticket"]:
+        st.markdown(
+            f"**Ticket:** [{ticket['ticket no.']}]({ticket['ticket']}) · "
+            f"state **{ticket['ticket state'] or 'unknown'}**"
+        )
     with session_scope() as s:
         md_text, pdf_bytes, _ = generate_report(s, incident_id)
     c1, c2 = st.columns(2)

@@ -10,7 +10,7 @@
 | First seen (UTC) | {{ incident.first_seen | dt }} |
 | Last seen (UTC) | {{ incident.last_seen | dt }} |
 | Alerts / events | {{ alerts | length }} / {{ total_events }} |
-| Ticket reference | {{ incident.external_ref or "none" }} |
+| Ticket reference | {{ incident.ticket_number or incident.external_ref or "none" }}{% if incident.ticket_state %} ({{ incident.ticket_state }}){% endif %} |
 | Report generated (UTC) | {{ generated_at | dt }} |
 
 ## 1. Summary

@@ -18,6 +18,7 @@ from logsentinel.alerts import SLA_TARGETS, update_alert
 from logsentinel.ingest import ingest_file
 from logsentinel.models import Alert, AlertNote, AlertStatus, Event, Incident, alert_events
 from logsentinel.pipeline import run_detection
+from logsentinel.ticketing import NoOpTicketingProvider
 
 ANALYSTS = ["analyst-1", "analyst-2", "analyst-3"]
 
@@ -105,6 +106,7 @@ def seed_demo(
             fields = line.split(",")
             labelled.update(f for f in (fields[2], fields[3]) if f)
         session.flush()
-        run = run_detection(session, send_notifications=False)
+        # Synthetic history must never open real tickets, whatever TICKETING_PROVIDER says.
+        run = run_detection(session, send_notifications=False, provider=NoOpTicketingProvider())
         triaged = simulate_triage(session, labelled, seed)
     return {"events": events, "alerts": len(run.new_alerts), "triaged": triaged}

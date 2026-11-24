@@ -54,6 +54,59 @@ class Settings:
     )
     # Dashboard: set READ_ONLY=1 to hide the triage buttons.
     read_only: bool = field(default_factory=lambda: _env("READ_ONLY") in {"1", "true", "yes"})
+    # Public URL of the dashboard, used for "open in LogSentinel" links in tickets.
+    dashboard_url: str = field(
+        default_factory=lambda: _env("DASHBOARD_URL", "http://localhost:8501").rstrip("/")
+    )
+
+    # Ticketing: "noop" (default, nothing leaves the machine) or "servicenow".
+    ticketing_provider: str = field(
+        default_factory=lambda: _env("TICKETING_PROVIDER", "noop").lower()
+    )
+    # Lowest incident severity that opens an external ticket.
+    ticket_min_severity: str = field(
+        default_factory=lambda: _env("TICKET_MIN_SEVERITY", "high").lower()
+    )
+    # ServiceNow (only read when TICKETING_PROVIDER=servicenow).
+    servicenow_instance_url: str = field(
+        default_factory=lambda: _env("SERVICENOW_INSTANCE_URL").rstrip("/")
+    )
+    servicenow_username: str = field(default_factory=lambda: _env("SERVICENOW_USERNAME"))
+    servicenow_password: str = field(
+        default_factory=lambda: _env("SERVICENOW_PASSWORD"), repr=False
+    )
+    servicenow_category: str = field(default_factory=lambda: _env("SERVICENOW_CATEGORY", "network"))
+    servicenow_assignment_group: str = field(
+        default_factory=lambda: _env("SERVICENOW_ASSIGNMENT_GROUP")
+    )
+    servicenow_timeout: float = field(
+        default_factory=lambda: float(_env("SERVICENOW_TIMEOUT", "15"))
+    )
+    servicenow_max_retries: int = field(
+        default_factory=lambda: _env_int("SERVICENOW_MAX_RETRIES", 4)
+    )
+
+
+def load_dotenv_file(path: Path | None = None) -> None:
+    """Load ``KEY=value`` lines from a local ``.env`` into the environment.
+
+    Only the entry points (CLI, dashboard) call this, never library code or tests,
+    so a developer's real credentials cannot leak into a test run. Variables
+    already set in the environment win over the file.
+    """
+    path = path or PROJECT_ROOT / ".env"
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.removeprefix("export ").strip()
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key, value)
 
 
 def get_settings() -> Settings:

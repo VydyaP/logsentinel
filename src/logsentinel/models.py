@@ -139,7 +139,13 @@ class Incident(Base):
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utcnow, onupdate=utcnow)
     # Reference returned by an external ticketing system (e.g. a ServiceNow sys_id).
-    external_ref: Mapped[str | None] = mapped_column(String(255))
+    external_ref: Mapped[str | None] = mapped_column(String(255), index=True)
+    # Human-facing ticket details, refreshed by the status sync job.
+    ticket_provider: Mapped[str | None] = mapped_column(String(32))
+    ticket_number: Mapped[str | None] = mapped_column(String(64))  # e.g. INC0010023
+    ticket_url: Mapped[str | None] = mapped_column(Text)
+    ticket_state: Mapped[str | None] = mapped_column(String(64))  # e.g. "In Progress"
+    ticket_synced_at: Mapped[datetime | None] = mapped_column(UTCDateTime)
 
     alerts: Mapped[list[Alert]] = relationship(back_populates="incident")
 
